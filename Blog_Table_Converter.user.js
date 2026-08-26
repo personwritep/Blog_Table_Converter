@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name        Blog Table ⭐ Converter
 // @namespace        http://tampermonkey.net/
-// @version        4.1
+// @version        4.2
 // @description        編集画面上のtable表の表仕様変換ツール
 // @author        Ameba Blog User
-// @match        https://blog.ameba.jp/ucs/entry/srventry*
-// @exclude        https://blog.ameba.jp/ucs/entry/srventrylist.do*
+// @match        https://blog.ameba.jp/ucs/entry/srventryinsertinput.do*
+// @match        https://blog.ameba.jp/ucs/entry/srventryupdateinput.do*
 // @icon        https://www.google.com/s2/favicons?sz=64&domain=ameblo.jp
 // @grant        none
 // @updateURL        https://github.com/personwritep/Blog_Table_Converter/raw/main/Blog_Table_Converter.user.js
