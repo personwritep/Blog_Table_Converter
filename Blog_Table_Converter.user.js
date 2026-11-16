@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        Blog Table ⭐ Converter
 // @namespace        http://tampermonkey.net/
-// @version        4.2
+// @version        4.3
 // @description        編集画面上のtable表の表仕様変換ツール
 // @author        Ameba Blog User
 // @match        https://blog.ameba.jp/ucs/entry/srventryinsertinput.do*
@@ -11,6 +11,11 @@
 // @updateURL        https://github.com/personwritep/Blog_Table_Converter/raw/main/Blog_Table_Converter.user.js
 // @downloadURL        https://github.com/personwritep/Blog_Table_Converter/raw/main/Blog_Table_Converter.user.js
 // ==/UserScript==
+
+
+let listen=Symbol();
+let listenI=Symbol();
+let listenE=Symbol();
 
 
 let retry=0;
@@ -55,36 +60,49 @@ function main(){
     catch_key();
 
     function catch_key(){
+        if(!document[listen]){
+            document.addEventListener('keydown', check_key);
+            document[listen]=true; }
+
         if(document.querySelector('.cke_wysiwyg_frame') !=null){ //「通常表示」から実行開始
             let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
             let iframe_doc=editor_iframe.contentWindow.document;
 
-            iframe_doc.addEventListener('keydown', check_key);
-            document.addEventListener('keydown', check_key);
+            if(!iframe_doc[listen]){
+                iframe_doc.addEventListener('keydown', check_key);
+                iframe_doc[listen]=true; }}
 
-            function check_key(event){
-                if(event.keyCode==13 && iframe_doc.hasFocus()){
-                    remove_mark(); } // 改行入力が連続マークとなるのを抑止
+        function check_key(event){
+            if(event.keyCode==13){ // Enterで選択行が改行されるのを防ぐ
+                let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+                if(editor_iframe){
+                    let iframe_doc=editor_iframe.contentWindow.document;
+                    if(iframe_doc){
+                        let node=iframe_doc.getSelection()?.anchorNode;
+                        if(!(node?.nodeType===Node.TEXT_NODE? node.parentElement : node)
+                           ?.closest ?.('table')){
+                            remove_mark(); }}}}
 
-                let gate=-1;
-                if(event.ctrlKey==true){
-                    if(event.keyCode==112){
-                        event.preventDefault(); gate=1; }
-                    if(gate==1){
-                        event.stopImmediatePropagation();
-                        do_task(); }}}
+            let gate=-1;
+            if(event.ctrlKey==true){
+                if(event.keyCode==112 && !event.repeat){ //「Ctrl+F1」パネル表示){
+                    event.preventDefault(); gate=1; }
+                if(gate==1){
+                    event.stopImmediatePropagation();
+                    do_task(); }}}
 
-            function do_task(){
-                if(task==0){
-                    caution();
-                    task=1;
-                    table_panel();
-                    enhanced(); }
-                else{
-                    task=0;
-                    remove_t_panel();
-                    remove_mark_all(); }}}
+        function do_task(){
+            if(task==0){
+                caution();
+                task=1;
+                table_panel();
+                show_first(1); }
+            else{
+                task=0;
+                remove_t_panel();
+                remove_mark_all(); }}
 
+        enhanced();
         before_end();
 
     } // catch_key()
@@ -234,54 +252,55 @@ function main(){
 
 
     function enhanced(){
-        let target_r=document.getElementById('cke_1_contents'); // 監視 target
-        let monitor_r=new MutationObserver(select);
-        monitor_r.observe(target_r, {childList: true}); // ショートカット待受け開始
+        if(document.querySelector('.cke_wysiwyg_frame') !=null){ //「通常表示」から実行開始
+            remove_mark_all(); // Html編集後のリセット
+            let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
+            let iframe_doc=editor_iframe.contentWindow.document;
+            if(iframe_doc){
+                let style_if=
+                    '<style id="style_if">'+
+                    '.amb_active { box-shadow: #fff -4px 0px, red -8px 0px !important; }'+
+                    '</style>';
 
-        select();
+                if(!iframe_doc.head.querySelector('#style_if')){
+                    iframe_doc.head.insertAdjacentHTML('beforeend', style_if); }
 
-        function select(){
-            if(document.querySelector('.cke_wysiwyg_frame') !=null){ //「通常表示」から実行開始
-                remove_mark_all(); // Html編集後のリセット
-                show_first(1);
-                let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
-                let iframe_doc=editor_iframe.contentWindow.document;
-                if(iframe_doc){
-                    let style_if=
-                        '<style id="style_if">'+
-                        '.amb_active { box-shadow: #fff -4px 0px, red -8px 0px !important; }'+
-                        '</style>';
+                let editor=iframe_doc.querySelector('.cke_editable');
+                if(editor){
+                    if(!editor[listenI]){
+                        editor.addEventListener('click', selector);
+                        editor[listenI]=true; }}
 
-                    if(!iframe_doc.head.querySelector('#style_if')){
-                        iframe_doc.head.insertAdjacentHTML('beforeend', style_if); }
 
-                    let editor=iframe_doc.querySelector('.cke_editable');
-                    if(editor){
-                        editor.onclick=function(event){
-                            event.stopImmediatePropagation();
+                function selector(event){
+                    if(task==1 || task==2 || task==3 || task==4){
+                        event.stopImmediatePropagation();
 
-                            if(event.ctrlKey){
-                                remove_mark_all();
-                                if(task==1 || task==2 || task==3 || task==4){
-                                    let elm=iframe_doc.elementFromPoint(event.clientX, event.clientY);
-                                    if(elm.closest('table')!=null){
-                                        let table_id=elm.closest('table').id;
-                                        if(table_id && table_id.includes('ambt')){
-                                            let style_tag=elm.closest('table').previousElementSibling;
-                                            if(style_tag && style_tag.classList.contains(table_id)){
-                                                remove_mark();
-                                                show_first(1);
-                                                setTimeout(()=>{
-                                                    alert(" ⛔ 選択した表は 軽量タイプの表で 処理の対象ではありません");
-                                                },20 ); }
-                                            else{
-                                                elm.closest('table').parentNode.classList.add('amb_active');
-                                                show_first(0);
-                                                task=3;
-                                                check_available(elm.closest('table'));
-                                                edit_table(task, elm.closest('table')); }}}}}} //「表更新」
+                        if(event.ctrlKey){ //「Ctrl+Click」
+                            remove_mark_all();
+                            let elm=iframe_doc.elementFromPoint(event.clientX, event.clientY);
+                            if(elm.closest('table')!=null){
+                                let table_id=elm.closest('table').id;
+                                if(table_id && table_id.includes('ambt')){
+                                    let style_tag=elm.closest('table').previousElementSibling;
+                                    if(style_tag && style_tag.classList.contains(table_id)){
+                                        remove_mark();
+                                        show_first(1);
+                                        setTimeout(()=>{
+                                            alert(" ⛔ 選択した表は 軽量タイプの表で 処理の対象ではありません");
+                                        },20 ); }
+                                    else{
+                                        elm.closest('table').parentNode.classList.add('amb_active');
+                                        show_first(0);
+                                        task=3;
+                                        check_available(elm.closest('table'));
+                                        edit_table(task, elm.closest('table')); }}}}
 
-                    }}}} // select()
+                    } // if(task==1 || task==2 || task==3 || task==4)
+
+                } //selector()
+
+            }} // select()
 
     } // enhanced()
 
@@ -743,8 +762,12 @@ function main(){
 
     function before_end(){
         let submitButton=document.querySelectorAll('.js-submitButton');
-        submitButton[0].addEventListener('mousedown', all_clear, false);
-        submitButton[1].addEventListener('mousedown', all_clear, false);
+        if(!submitButton[0][listenE]){
+            submitButton[0].addEventListener('mousedown', all_clear, false);
+            submitButton[0][listenE]=true; }
+        if(!submitButton[1][listenE]){
+            submitButton[1].addEventListener('mousedown', all_clear, false);
+            submitButton[1][listenE]=true; }
 
         function all_clear(){
             let editor_iframe=document.querySelector('.cke_wysiwyg_frame');
